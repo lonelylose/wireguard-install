@@ -201,6 +201,29 @@ function installWireGuard() {
 		apt update
 		apt-get install -y iptables resolvconf qrencode
 		apt-get install -y -t buster-backports wireguard
+	# Get current DNS servers from /etc/resolv.conf
+    CURRENT_DNS=$(grep "^nameserver" /etc/resolv.conf)
+
+	if [ -n "$CURRENT_DNS" ]; then
+    	echo "Configuring resolvconf with current system DNS..."
+    
+    	# Clear the head file to avoid duplicates on re-run, or you can choose to append.
+    	# This example will overwrite the file each time for simplicity.
+    	# If you want to append, use '>>' but handle duplicates manually.
+    	# For this script's purpose, overwriting is generally safe.
+    	echo "# Added by wireguard-install.sh" > /etc/resolvconf/resolv.conf.d/head
+    	echo "$CURRENT_DNS" >> /etc/resolvconf/resolv.conf.d/head
+    
+    	# Add a newline for separation
+    	echo "" >> /etc/resolvconf/resolv.conf.d/head
+
+    	# Update /etc/resolv.conf with the new configuration
+    	resolvconf -u
+    
+    	echo "resolvconf has been updated successfully."
+	else
+    	echo "Could not find current DNS servers in /etc/resolv.conf. Skipping resolvconf configuration."
+	fi	
 	elif [[ ${OS} == 'fedora' ]]; then
 		if [[ ${VERSION_ID} -lt 32 ]]; then
 			dnf install -y dnf-plugins-core
@@ -265,12 +288,14 @@ PostDown = firewall-cmd --zone=public --add-interface=${SERVER_WG_NIC} && firewa
 PostUp = iptables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_WG_NIC} -j ACCEPT
 PostUp = iptables -I FORWARD -i ${SERVER_WG_NIC} -j ACCEPT
 PostUp = iptables -t nat -A POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE
+PostUp = ip6tables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostUp = ip6tables -I FORWARD -i ${SERVER_WG_NIC} -j ACCEPT
 PostUp = ip6tables -t nat -A POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE
 PostDown = iptables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostDown = iptables -D FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_WG_NIC} -j ACCEPT
 PostDown = iptables -D FORWARD -i ${SERVER_WG_NIC} -j ACCEPT
 PostDown = iptables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE
+PostDown = ip6tables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostDown = ip6tables -D FORWARD -i ${SERVER_WG_NIC} -j ACCEPT
 PostDown = ip6tables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >>"/etc/wireguard/${SERVER_WG_NIC}.conf"
 	fi
