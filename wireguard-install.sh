@@ -192,38 +192,15 @@ function installWireGuard() {
 	# Install WireGuard tools and module
 	if [[ ${OS} == 'ubuntu' ]] || [[ ${OS} == 'debian' && ${VERSION_ID} -gt 10 ]]; then
 		apt-get update
-		apt-get install -y wireguard iptables resolvconf qrencode
+		apt-get install -y wireguard iptables qrencode
 	elif [[ ${OS} == 'debian' ]]; then
 		if ! grep -rqs "^deb .* buster-backports" /etc/apt/; then
 			echo "deb http://deb.debian.org/debian buster-backports main" >/etc/apt/sources.list.d/backports.list
 			apt-get update
 		fi
 		apt update
-		apt-get install -y iptables resolvconf qrencode
-		apt-get install -y -t buster-backports wireguard
-	# Get current DNS servers from /etc/resolv.conf
-    CURRENT_DNS=$(grep "^nameserver" /etc/resolv.conf)
-
-	if [ -n "$CURRENT_DNS" ]; then
-    	echo "Configuring resolvconf with current system DNS..."
-    
-    	# Clear the head file to avoid duplicates on re-run, or you can choose to append.
-    	# This example will overwrite the file each time for simplicity.
-    	# If you want to append, use '>>' but handle duplicates manually.
-    	# For this script's purpose, overwriting is generally safe.
-    	echo "# Added by wireguard-install.sh" > /etc/resolvconf/resolv.conf.d/head
-    	echo "$CURRENT_DNS" >> /etc/resolvconf/resolv.conf.d/head
-    
-    	# Add a newline for separation
-    	echo "" >> /etc/resolvconf/resolv.conf.d/head
-
-    	# Update /etc/resolv.conf with the new configuration
-    	resolvconf -u
-    
-    	echo "resolvconf has been updated successfully."
-	else
-    	echo "Could not find current DNS servers in /etc/resolv.conf. Skipping resolvconf configuration."
-	fi	
+		apt-get install -y iptables qrencode
+		apt-get install -y -t buster-backports wireguard	
 	elif [[ ${OS} == 'fedora' ]]; then
 		if [[ ${VERSION_ID} -lt 32 ]]; then
 			dnf install -y dnf-plugins-core
