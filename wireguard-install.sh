@@ -11,8 +11,8 @@
 # 5. Ability to delete specific interfaces
 # 
 # Update Log:
+# - Fixed systemd ghost state after interface deletion (reset-failed)
 # - Fixed bug where interface selection menu text was captured into variables
-#   causing deletion and user addition to fail.
 # ---------------------------------------------------------
 
 RED='\033[0;31m'
@@ -358,13 +358,19 @@ function remove_interface() {
     read -p "Are you sure? [y/N]: " -n 1 -r
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # 1. Stop and disable
         systemctl stop "wg-quick@$SELECTED_NIC"
         systemctl disable "wg-quick@$SELECTED_NIC"
+        
+        # 2. Remove files
         rm "/etc/wireguard/$SELECTED_NIC.conf"
-        # Also try to remove client configs associated with this interface to keep home clean
         rm -f "${HOME}/$SELECTED_NIC-client-"*.conf
         
-        echo "Interface $SELECTED_NIC removed."
+        # 3. Clean systemd state (The crucial fix)
+        systemctl reset-failed "wg-quick@$SELECTED_NIC"
+        systemctl daemon-reload
+        
+        echo "Interface $SELECTED_NIC removed and systemd cleaned."
     else
         echo "Aborted."
     fi
