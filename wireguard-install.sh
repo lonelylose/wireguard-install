@@ -9,6 +9,10 @@
 # 3. Independent MTU/Port/Subnet settings per interface
 # 4. Detailed multi-line iptables rules in config
 # 5. Ability to delete specific interfaces
+# 
+# Update Log:
+# - Fixed bug where interface selection menu text was captured into variables
+#   causing deletion and user addition to fail.
 # ---------------------------------------------------------
 
 RED='\033[0;31m'
@@ -183,7 +187,6 @@ function setup_new_interface() {
 
 	echo "Saving config to /etc/wireguard/$SERVER_WG_NIC.conf..."
 
-    # 使用多行 PostUp/PostDown 格式，并包含 INPUT 端口放行
 	cat > "/etc/wireguard/$SERVER_WG_NIC.conf" <<EOF
 [Interface]
 Address = $SERVER_WG_IPV4/24,$SERVER_WG_IPV6/64
@@ -316,23 +319,26 @@ function select_interface_menu() {
     mapfile -t configs < <(ls /etc/wireguard/*.conf 2>/dev/null)
     
     if [ ${#configs[@]} -eq 0 ]; then
-        echo "No WireGuard interfaces found."
+        echo "No WireGuard interfaces found." >&2
         return 1
     elif [ ${#configs[@]} -eq 1 ]; then
         basename "${configs[0]}" .conf
     else
-        echo "$prompt"
+        # FIX: Output menu to stderr so it's NOT captured by variable
+        echo "$prompt" >&2
         local i=0
         for conf in "${configs[@]}"; do
-            echo "$i) $(basename "$conf" .conf)"
+            echo "$i) $(basename "$conf" .conf)" >&2
             ((i++))
         done
-        echo ""
+        echo "" >&2
         read -p "Select interface [0-$((i-1))]: " selection
+        
+        # Only echo the RESULT to stdout
         if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 0 ] && [ "$selection" -lt "$i" ]; then
             basename "${configs[$selection]}" .conf
         else
-            echo "Invalid selection."
+            echo "Invalid selection." >&2
             return 1
         fi
     fi
